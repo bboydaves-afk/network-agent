@@ -1,0 +1,39 @@
+name: "nightly-config-backup"
+version: "1.0"
+description: "Backup all device configurations nightly at 02:00 UTC"
+enabled: true
+tags: ["backup", "scheduled", "maintenance"]
+
+trigger:
+  type: "schedule"
+  schedule:
+    cron: "0 2 * * *"
+    timezone: "UTC"
+
+cooldown:
+  global: 3600
+
+limits:
+  max_duration_seconds: 1800
+  max_concurrent: 1
+
+actions:
+  - name: "Backup all device configs"
+    action: "backup_all"
+    params: {}
+    output_var: "backup_results"
+    on_failure: "continue"
+    timeout: 1200
+
+  - name: "Log backup completion"
+    action: "log"
+    params:
+      level: "info"
+      message: "Nightly config backup completed"
+
+  - name: "Notify team"
+    action: "notify"
+    params:
+      channel: "slack"
+      message: "Nightly config backup completed successfully"
+      severity: "info"

@@ -1,0 +1,75 @@
+name: cis-network
+description: CIS Network Device Benchmark - Essential checks
+version: "1.0"
+rules:
+  - name: ssh_v2_only
+    type: config_contains
+    pattern: "ip ssh version 2"
+    description: "Ensure SSH version 2 is configured"
+    severity: high
+
+  - name: no_telnet
+    type: config_not_contains
+    pattern: "transport input telnet"
+    description: "Ensure Telnet is disabled on VTY lines"
+    severity: high
+
+  - name: ntp_configured
+    type: config_contains
+    pattern: "ntp server"
+    description: "Ensure NTP is configured"
+    severity: medium
+
+  - name: no_public_snmp
+    type: config_not_contains
+    pattern: "snmp-server community public"
+    description: "Ensure default SNMP community 'public' is removed"
+    severity: critical
+
+  - name: login_banner
+    type: config_contains
+    pattern: "banner login"
+    description: "Ensure login banner is configured"
+    severity: low
+
+  - name: logging_enabled
+    type: config_contains
+    pattern: "logging"
+    description: "Ensure logging is enabled"
+    severity: medium
+
+  - name: password_encryption
+    type: config_contains
+    pattern: "service password-encryption"
+    description: "Ensure password encryption service is enabled"
+    severity: high
+
+  - name: exec_timeout
+    type: config_regex
+    pattern: "exec-timeout \\d+ \\d+"
+    description: "Ensure exec timeout is configured on VTY lines"
+    severity: medium
+
+  - name: enable_secret
+    type: config_contains
+    pattern: "enable secret"
+    description: "Ensure enable secret is configured (not enable password)"
+    severity: high
+
+  - name: no_ip_source_route
+    type: config_contains
+    pattern: "no ip source-route"
+    description: "Ensure IP source routing is disabled"
+    severity: medium
+
+  - name: acl_on_vty
+    type: config_contains
+    pattern: "access-class"
+    description: "Ensure ACLs are applied to VTY lines"
+    severity: high
+
+  - name: aaa_authentication
+    type: config_contains
+    pattern: "aaa authentication"
+    description: "Ensure AAA authentication is configured"
+    severity: high

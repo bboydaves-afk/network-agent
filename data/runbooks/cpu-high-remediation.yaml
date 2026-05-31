@@ -1,0 +1,90 @@
+name: "cpu-high-remediation"
+version: "1.0"
+description: "Remediate high CPU: gather diagnostics, notify, wait 5 min, re-check, escalate if persistent"
+enabled: true
+tags: ["cpu", "auto-remediation", "alert"]
+
+trigger:
+  type: "alert"
+  alert_match:
+    rule_id: "rule-cpu-critical"
+    severity: ["critical", "warning"]
+
+cooldown:
+  per_device: 600
+
+limits:
+  max_duration_seconds: 900
+  max_concurrent: 3
+
+actions:
+  - name: "Gather CPU processes"
+    action: "run_command"
+    params:
+      device_id: "{{device_id}}"
+      command: "show processes cpu sorted"
+    output_var: "cpu_output"
+    on_failure: "continue"
+    timeout: 30
+
+  - name: "Log high CPU event"
+    action: "log"
+    params:
+      level: "warning"
+      message: "High CPU detected on {{device_id}} ({{metric_value}}%). Gathering diagnostics."
+
+  - name: "Notify team"
+    action: "notify"
+    params:
+      channel: "slack"
+      message: "High CPU on {{device_id}} ({{metric_value}}%). Top processes: {{cpu_output}}"
+      severity: "warning"
+
+  - name: "Wait 5 minutes for self-resolution"
+    action: "wait"
+    params:
+      seconds: 300
+
+  - name: "Re-poll device metrics"
+    action: "poll_device"
+    params:
+      device_id: "{{device_id}}"
+    output_var: "recheck"
+    on_failure: "continue"
+    timeout: 30
+
+  - name: "Check if CPU still high"
+    action: "condition"
+    params:
+      check: "metric_threshold"
+      metric_value: "{{recheck.cpu_percent}}"
+      condition: "gt"
+      threshold: 90
+    on_true: "escalate_step"
+    on_false: "resolved_step"
+
+  - name: "escalate_step"
+    action: "escalate"
+    params:
+      level: 1
+      message: "CPU still critical on {{device_id}} ({{recheck.cpu_percent}}%) after 5-minute wait. Manual investigation required."
+      channels: ["slack", "email"]
+
+  - name: "resolved_step"
+    action: "notify"
+    params:
+      channel: "slack"
+      message: "CPU on {{device_id}} returned to normal after 5-minute wait."
+      severity: "info"
+
+escalation:
+  levels:
+    - level: 1
+      channels: ["slack"]
+      wait_minutes: 10
+    - level: 2
+      channels: ["slack", "email"]
+      wait_minutes: 30
+    - level: 3
+      channels: ["slack", "email", "webhook"]
+      message_prefix: "URGENT: "

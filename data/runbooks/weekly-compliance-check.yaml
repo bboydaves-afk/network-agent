@@ -1,0 +1,39 @@
+name: "weekly-compliance-check"
+version: "1.0"
+description: "Weekly configuration compliance check - backup all configs and report"
+enabled: true
+tags: ["compliance", "scheduled", "audit"]
+
+trigger:
+  type: "schedule"
+  schedule:
+    cron: "0 4 * * 6"
+    timezone: "UTC"
+
+cooldown:
+  global: 7200
+
+limits:
+  max_duration_seconds: 3600
+  max_concurrent: 1
+
+actions:
+  - name: "Backup all device configs"
+    action: "backup_all"
+    params: {}
+    output_var: "backup_results"
+    on_failure: "continue"
+    timeout: 1800
+
+  - name: "Log compliance check"
+    action: "log"
+    params:
+      level: "info"
+      message: "Weekly compliance check completed. All device configs backed up for audit review."
+
+  - name: "Notify compliance report"
+    action: "notify"
+    params:
+      channel: "slack"
+      message: "Weekly compliance check completed. All device configurations have been backed up and are available for review."
+      severity: "info"

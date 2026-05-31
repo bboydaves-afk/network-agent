@@ -1,0 +1,86 @@
+name: "interface-error-remediation"
+version: "1.0"
+description: "Clear interface counters on high-error interfaces, re-check after 5 minutes"
+enabled: true
+tags: ["interfaces", "errors", "auto-remediation"]
+
+trigger:
+  type: "alert"
+  alert_match:
+    rule_id: "rule-interface-errors"
+    severity: ["warning", "critical"]
+
+cooldown:
+  per_device: 600
+
+limits:
+  max_duration_seconds: 600
+  max_concurrent: 3
+
+actions:
+  - name: "Check which interfaces have errors"
+    action: "check_interface_errors"
+    params:
+      device_id: "{{device_id}}"
+    output_var: "error_interfaces"
+    on_failure: "abort"
+    timeout: 30
+
+  - name: "Clear interface counters"
+    action: "run_command"
+    params:
+      device_id: "{{device_id}}"
+      command: "clear counters"
+    on_failure: "escalate"
+    timeout: 30
+
+  - name: "Notify team of action taken"
+    action: "notify"
+    params:
+      channel: "slack"
+      message: "Cleared interface counters on {{device_id}} due to error threshold. Rechecking in 5 minutes."
+      severity: "warning"
+
+  - name: "Wait 5 minutes for counters to accumulate"
+    action: "wait"
+    params:
+      seconds: 300
+
+  - name: "Re-check interface errors"
+    action: "check_interface_errors"
+    params:
+      device_id: "{{device_id}}"
+    output_var: "recheck_errors"
+    on_failure: "continue"
+    timeout: 30
+
+  - name: "Evaluate if errors persist"
+    action: "condition"
+    params:
+      check: "list_not_empty"
+      value: "{{recheck_errors}}"
+    on_true: "escalate_step"
+    on_false: "resolved_step"
+
+  - name: "escalate_step"
+    action: "escalate"
+    params:
+      level: 1
+      message: "Interface errors persist on {{device_id}} after counter clear. Manual investigation required."
+      channels: ["slack", "email"]
+
+  - name: "resolved_step"
+    action: "notify"
+    params:
+      channel: "slack"
+      message: "Interface errors on {{device_id}} resolved after counter clear."
+      severity: "info"
+
+escalation:
+  levels:
+    - level: 1
+      channels: ["slack"]
+      wait_minutes: 15
+    - level: 2
+      channels: ["slack", "email"]
+      wait_minutes: 30

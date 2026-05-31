@@ -1,0 +1,51 @@
+name: custom-baseline
+description: Custom organizational baseline checks
+version: "1.0"
+rules:
+  - name: domain_name
+    type: config_contains
+    pattern: "ip domain-name"
+    description: "Ensure domain name is configured"
+    severity: low
+
+  - name: dns_servers
+    type: config_contains
+    pattern: "ip name-server"
+    description: "Ensure DNS servers are configured"
+    severity: medium
+
+  - name: syslog_destination
+    type: config_contains
+    pattern: "logging host"
+    description: "Ensure syslog destination is configured"
+    severity: medium
+
+  - name: snmp_v3
+    type: config_contains
+    pattern: "snmp-server group"
+    description: "Ensure SNMP v3 is configured"
+    severity: high
+
+  - name: ntp_authentication
+    type: config_contains
+    pattern: "ntp authenticate"
+    description: "Ensure NTP authentication is enabled"
+    severity: medium
+
+  - name: dhcp_snooping
+    type: config_contains
+    pattern: "ip dhcp snooping"
+    description: "Ensure DHCP snooping is enabled"
+    severity: medium
+
+  - name: spanning_tree_mode
+    type: config_contains
+    pattern: "spanning-tree mode rapid"
+    description: "Ensure Rapid Spanning Tree is configured"
+    severity: medium
+
+  - name: hostname_set
+    type: config_regex
+    pattern: "hostname [A-Za-z]"
+    description: "Ensure hostname is configured (not default)"
+    severity: low

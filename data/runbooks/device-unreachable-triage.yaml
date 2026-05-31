@@ -1,0 +1,73 @@
+name: "device-unreachable-triage"
+version: "1.0"
+description: "Multi-source ping and diagnostics when a device becomes unreachable"
+enabled: true
+tags: ["connectivity", "triage", "auto-remediation"]
+
+trigger:
+  type: "alert"
+  alert_match:
+    rule_id: "rule-device-unreachable"
+    severity: ["critical"]
+
+cooldown:
+  per_device: 300
+
+limits:
+  max_duration_seconds: 300
+  max_concurrent: 5
+
+actions:
+  - name: "Ping device from local machine"
+    action: "ping_test"
+    params:
+      target: "{{device_ip}}"
+      count: 4
+    output_var: "ping_local"
+    on_failure: "continue"
+    timeout: 30
+
+  - name: "Log ping results"
+    action: "log"
+    params:
+      level: "warning"
+      message: "Device {{device_id}} ({{device_ip}}) unreachable. Local ping: {{ping_local}}"
+
+  - name: "Check port 22 SSH"
+    action: "check_port"
+    params:
+      target: "{{device_ip}}"
+      port: 22
+      timeout: 5
+    output_var: "ssh_check"
+    on_failure: "continue"
+    timeout: 15
+
+  - name: "Check port 443 HTTPS"
+    action: "check_port"
+    params:
+      target: "{{device_ip}}"
+      port: 443
+      timeout: 5
+    output_var: "https_check"
+    on_failure: "continue"
+    timeout: 15
+
+  - name: "Escalate with diagnostic results"
+    action: "escalate"
+    params:
+      level: 1
+      message: "DEVICE UNREACHABLE: {{device_id}} ({{device_ip}})\nPing: {{ping_local}}\nSSH (22): {{ssh_check}}\nHTTPS (443): {{https_check}}"
+      channels: ["slack", "email"]
+
+escalation:
+  levels:
+    - level: 1
+      channels: ["slack"]
+      wait_minutes: 5
+    - level: 2
+      channels: ["slack", "email"]
+      wait_minutes: 15
+    - level: 3
+      channels: ["slack", "email", "webhook"]
+      message_prefix: "CRITICAL: "

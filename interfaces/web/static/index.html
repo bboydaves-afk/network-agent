@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NetworkAgent Dashboard</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.6/standalone/umd/vis-network.min.js"></script>
+</head>
+<body>
+
+<!-- ===== TOP NAVBAR ===== -->
+<nav class="navbar">
+    <div class="navbar-brand">
+        <span class="brand-icon">&#9672;</span>
+        <span class="brand-text">NetworkAgent</span>
+    </div>
+    <div class="navbar-status">
+        <span id="ws-indicator" class="status-dot offline" title="WebSocket disconnected"></span>
+        <span id="ws-label" class="navbar-label">Disconnected</span>
+    </div>
+    <div class="navbar-right">
+        <span id="alert-badge" class="alert-badge hidden">0</span>
+        <span class="navbar-label" id="clock"></span>
+    </div>
+</nav>
+
+<!-- ===== LAYOUT ===== -->
+<div class="layout">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <ul class="nav-list">
+            <li><a href="#" class="nav-link active" data-view="dashboard"><span class="nav-icon">&#9632;</span> Dashboard</a></li>
+            <li><a href="#" class="nav-link" data-view="devices"><span class="nav-icon">&#9881;</span> Devices</a></li>
+            <li><a href="#" class="nav-link" data-view="configs"><span class="nav-icon">&#9998;</span> Config</a></li>
+            <li><a href="#" class="nav-link" data-view="monitoring"><span class="nav-icon">&#9776;</span> Monitoring</a></li>
+            <li><a href="#" class="nav-link" data-view="alerts"><span class="nav-icon">&#9888;</span> Alerts</a></li>
+            <li><a href="#" class="nav-link" data-view="discovery"><span class="nav-icon">&#8982;</span> Discovery</a></li>
+            <li><a href="#" class="nav-link" data-view="diagnostics"><span class="nav-icon">&#8623;</span> Diagnostics</a></li>
+            <li><a href="#" class="nav-link" data-view="automation"><span class="nav-icon">&#9881;</span> Automation</a></li>
+            <li><a href="#" class="nav-link" data-view="sites"><span class="nav-icon">&#9962;</span> Sites</a></li>
+            <li><a href="#" class="nav-link" data-view="topology"><span class="nav-icon">&#9733;</span> Topology</a></li>
+            <li><a href="#" class="nav-link" data-view="firmware"><span class="nav-icon">&#8644;</span> Firmware</a></li>
+            <li><a href="#" class="nav-link" data-view="ipam"><span class="nav-icon">&#8999;</span> IPAM</a></li>
+            <li><a href="#" class="nav-link" data-view="traffic"><span class="nav-icon">&#8693;</span> Traffic</a></li>
+            <li><a href="#" class="nav-link" data-view="syslog"><span class="nav-icon">&#9998;</span> Syslog</a></li>
+            <li><a href="#" class="nav-link" data-view="compliance"><span class="nav-icon">&#10003;</span> Compliance</a></li>
+            <li><a href="#" class="nav-link" data-view="changes"><span class="nav-icon">&#9997;</span> Changes</a></li>
+            <li><a href="#" class="nav-link" data-view="credentials"><span class="nav-icon">&#9919;</span> Credentials</a></li>
+            <li><a href="#" class="nav-link" data-view="firewall"><span class="nav-icon">&#128737;</span> Firewall</a></li>
+            <li><a href="#" class="nav-link" data-view="chat"><span class="nav-icon">&#9993;</span> AI Chat</a></li>
+        </ul>
+    </aside>
+
+    <!-- Main content -->
+    <main class="content" id="content">
+
+        <!-- ===== DASHBOARD VIEW ===== -->
+        <section class="view active" id="view-dashboard">
+            <h2 class="view-title">Dashboard</h2>
+
+            <div class="card-grid">
+                <div class="summary-card">
+                    <div class="card-label">Total Devices</div>
+                    <div class="card-value" id="stat-total">--</div>
+                </div>
+                <div class="summary-card card-green">
+                    <div class="card-label">Online</div>
+                    <div class="card-value" id="stat-online">--</div>
+                </div>
+                <div class="summary-card card-red">
+                    <div class="card-label">Offline</div>
+                    <div class="card-value" id="stat-offline">--</div>
+                </div>
+                <div class="summary-card card-yellow">
+                    <div class="card-label">Active Alerts</div>
+                    <div class="card-value" id="stat-alerts">--</div>
+                </div>
+            </div>
+
+            <div class="panel-row">
+                <div class="panel half">
+                    <h3 class="panel-title">CPU Utilization (Avg)</h3>
+                    <div class="chart-container"><canvas id="chart-cpu"></canvas></div>
+                </div>
+                <div class="panel half">
+                    <h3 class="panel-title">Memory Utilization (Avg)</h3>
+                    <div class="chart-container"><canvas id="chart-mem"></canvas></div>
+                </div>
+            </div>
+
+            <div class="panel-row">
+                <div class="panel two-thirds">
+                    <h3 class="panel-title">Recent Alerts</h3>
+                    <div class="table-wrap">
+                        <table class="data-table" id="recent-alerts-table">
+                            <thead><tr><th>Time</th><th>Device</th><th>Severity</th><th>Message</th><th>Status</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="panel one-third">
+                    <h3 class="panel-title">Top Devices</h3>
+                    <div class="table-wrap">
+                        <table class="data-table" id="top-devices-table">
+                            <thead><tr><th>Device</th><th>Status</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== DEVICES VIEW ===== -->
+        <section class="view" id="view-devices">
+            <h2 class="view-title">Device Management</h2>
+
+            <div class="toolbar">
+                <input type="text" class="input" id="device-search" placeholder="Search devices...">
+                <select class="input select" id="device-filter-status">
+                    <option value="">All Statuses</option>
+                    <option value="online">Online</option>
+                    <option value="offline">Offline</option>
+                    <option value="degraded">Degraded</option>
+                </select>
+                <button class="btn btn-primary" id="btn-add-device">+ Add Device</button>
+            </div>
+
+            <div class="table-wrap">
+                <table class="data-table" id="devices-table">
+                    <thead><tr><th>Hostname</th><th>IP Address</th><th>Type</th><th>Vendor</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- Add / Edit Device Modal -->
+            <div class="modal-overlay hidden" id="device-modal">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 id="device-modal-title">Add Device</h3>
+                        <button class="modal-close" id="device-modal-close">&times;</button>
+                    </div>
+                    <form id="device-form">
+                        <input type="hidden" id="df-id">
+                        <div class="form-group"><label>Hostname</label><input type="text" class="input" id="df-hostname" required></div>
+                        <div class="form-group"><label>IP Address</label><input type="text" class="input" id="df-ip" required></div>
+                        <div class="form-group"><label>Device Type</label>
+                            <select class="input select" id="df-type">
+                                <option value="router">Router</option>
+                                <option value="switch">Switch</option>
+                                <option value="firewall">Firewall</option>
+                                <option value="access_point">Access Point</option>
+                                <option value="server">Server</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Vendor</label><input type="text" class="input" id="df-vendor"></div>
+                        <div class="form-group"><label>Model</label><input type="text" class="input" id="df-model"></div>
+                        <div class="form-group"><label>Location</label><input type="text" class="input" id="df-location"></div>
+                        <div class="form-group"><label>Credential ID</label><input type="text" class="input" id="df-cred"></div>
+                        <div class="form-actions">
+                            <button type="button" class="btn" id="btn-cancel-device">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Device Detail Panel -->
+            <div class="slide-panel hidden" id="device-detail-panel">
+                <div class="panel-header">
+                    <h3 id="detail-hostname">--</h3>
+                    <button class="modal-close" id="detail-close">&times;</button>
+                </div>
+                <div class="detail-body" id="detail-body"></div>
+            </div>
+        </section>
+
+        <!-- ===== CONFIGS VIEW ===== -->
+        <section class="view" id="view-configs">
+            <h2 class="view-title">Configuration Management</h2>
+
+            <div class="toolbar">
+                <select class="input select" id="config-device-select">
+                    <option value="">Select Device...</option>
+                </select>
+                <button class="btn btn-primary" id="btn-backup-config">Backup Now</button>
+                <button class="btn" id="btn-backup-all">Backup All</button>
+            </div>
+
+            <div class="panel-row">
+                <div class="panel half">
+                    <h3 class="panel-title">Backup History</h3>
+                    <div class="table-wrap">
+                        <table class="data-table" id="config-history-table">
+                            <thead><tr><th>Date</th><th>Type</th><th>Size</th><th>Actions</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="panel half">
+                    <h3 class="panel-title">Config Viewer / Diff</h3>
+                    <pre class="code-block" id="config-viewer">Select a backup to view its content...</pre>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3 class="panel-title">Deploy Configuration</h3>
+                <div class="form-group"><label>Commands (one per line)</label>
+                    <textarea class="input textarea" id="deploy-commands" rows="6" placeholder="interface GigabitEthernet0/1&#10;description Uplink&#10;no shutdown"></textarea>
+                </div>
+                <div class="form-actions">
+                    <label class="checkbox-label"><input type="checkbox" id="deploy-dryrun"> Dry Run</label>
+                    <button class="btn btn-primary" id="btn-deploy">Deploy</button>
+                </div>
+                <pre class="code-block" id="deploy-result"></pre>
+            </div>
+        </section>
+
+        <!-- ===== MONITORING VIEW ===== -->
+        <section class="view" id="view-monitoring">
+            <h2 class="view-title">Monitoring</h2>
+
+            <div class="toolbar">
+                <select class="input select" id="mon-device-select">
+                    <option value="">Select Device...</option>
+                </select>
+                <select class="input select" id="mon-metric-select">
+                    <option value="">All Metrics</option>
+                    <option value="cpu_utilization">CPU</option>
+                    <option value="memory_utilization">Memory</option>
+                    <option value="interface_utilization">Interface</option>
+                    <option value="uptime">Uptime</option>
+                </select>
+                <select class="input select" id="mon-hours-select">
+                    <option value="1">Last 1h</option>
+                    <option value="6">Last 6h</option>
+                    <option value="24" selected>Last 24h</option>
+                    <option value="168">Last 7d</option>
+                </select>
+                <button class="btn btn-primary" id="btn-poll-device">Poll Now</button>
+                <button class="btn" id="btn-poll-all">Poll All</button>
+            </div>
+
+            <div class="panel">
+                <h3 class="panel-title">Metrics</h3>
+                <div class="chart-container chart-large"><canvas id="chart-metrics"></canvas></div>
+            </div>
+        </section>
+
+        <!-- ===== ALERTS VIEW ===== -->
+        <section class="view" id="view-alerts">
+            <h2 class="view-title">Alerts</h2>
+
+            <div class="toolbar">
+                <select class="input select" id="alert-filter-status">
+                    <option value="">All</option>
+                    <option value="active" selected>Active</option>
+                    <option value="acknowledged">Acknowledged</option>
+                    <option value="resolved">Resolved</option>
+                </select>
+                <button class="btn btn-primary" id="btn-add-rule">+ Add Rule</button>
+            </div>
+
+            <div class="panel-row">
+                <div class="panel two-thirds">
+                    <h3 class="panel-title">Alert List</h3>
+                    <div class="table-wrap">
+                        <table class="data-table" id="alerts-table">
+                            <thead><tr><th>Time</th><th>Device</th><th>Rule</th><th>Severity</th><th>Message</th><th>Status</th><th>Actions</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="panel one-third">
+                    <h3 class="panel-title">Alert Rules</h3>
+                    <div class="table-wrap">
+                        <table class="data-table" id="rules-table">
+                            <thead><tr><th>Name</th><th>Metric</th><th>Threshold</th><th>Actions</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add Rule Modal -->
+            <div class="modal-overlay hidden" id="rule-modal">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3>Create Alert Rule</h3>
+                        <button class="modal-close" id="rule-modal-close">&times;</button>
+                    </div>
+                    <form id="rule-form">
+                        <div class="form-group"><label>Rule Name</label><input type="text" class="input" id="rf-name" required></div>
+                        <div class="form-group"><label>Metric Name</label>
+                            <select class="input select" id="rf-metric">
+                                <option value="cpu_utilization">CPU Utilization</option>
+                                <option value="memory_utilization">Memory Utilization</option>
+                                <option value="interface_utilization">Interface Utilization</option>
+                                <option value="packet_loss">Packet Loss</option>
+                                <option value="latency">Latency</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Condition</label>
+                            <select class="input select" id="rf-condition">
+                                <option value="gt">Greater Than</option>
+                                <option value="lt">Less Than</option>
+                                <option value="eq">Equals</option>
+                                <option value="gte">Greater Than or Equal</option>
+                                <option value="lte">Less Than or Equal</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Threshold</label><input type="number" class="input" id="rf-threshold" step="0.1" required></div>
+                        <div class="form-group"><label>Severity</label>
+                            <select class="input select" id="rf-severity">
+                                <option value="info">Info</option>
+                                <option value="warning">Warning</option>
+                                <option value="critical">Critical</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn" id="btn-cancel-rule">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Create Rule</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== DISCOVERY VIEW ===== -->
+        <section class="view" id="view-discovery">
+            <h2 class="view-title">Network Discovery</h2>
+
+            <div class="panel">
+                <h3 class="panel-title">Subnet Scan</h3>
+                <div class="form-row">
+                    <div class="form-group"><label>Subnet (CIDR)</label><input type="text" class="input" id="disc-subnet" placeholder="192.168.1.0/24"></div>
+                    <div class="form-group"><label>SNMP Community</label><input type="text" class="input" id="disc-community" value="public"></div>
+                    <div class="form-group"><label>Timeout (s)</label><input type="number" class="input" id="disc-timeout" value="2" min="1" max="30"></div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn" id="btn-ping-sweep">Ping Sweep</button>
+                    <button class="btn btn-primary" id="btn-snmp-scan">SNMP Scan</button>
+                    <button class="btn btn-success" id="btn-auto-discover">Auto Discover &amp; Add</button>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3 class="panel-title">Discovery Results</h3>
+                <div id="discovery-status" class="status-message hidden"></div>
+                <div class="table-wrap">
+                    <table class="data-table" id="discovery-table">
+                        <thead><tr><th>IP Address</th><th>Hostname</th><th>Vendor</th><th>Type</th><th>Status</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== DIAGNOSTICS VIEW ===== -->
+        <section class="view" id="view-diagnostics">
+            <h2 class="view-title">Diagnostics</h2>
+
+            <div class="panel-row">
+                <div class="panel one-third">
+                    <h3 class="panel-title">Ping</h3>
+                    <div class="form-group"><label>Target</label><input type="text" class="input" id="diag-ping-target" placeholder="192.168.1.1"></div>
+                    <div class="form-group"><label>Count</label><input type="number" class="input" id="diag-ping-count" value="4" min="1" max="100"></div>
+                    <div class="form-group"><label>Source Device (optional)</label>
+                        <select class="input select" id="diag-ping-source"><option value="">Local</option></select>
+                    </div>
+                    <button class="btn btn-primary" id="btn-diag-ping">Run Ping</button>
+                    <pre class="code-block" id="diag-ping-result"></pre>
+                </div>
+
+                <div class="panel one-third">
+                    <h3 class="panel-title">Traceroute</h3>
+                    <div class="form-group"><label>Target</label><input type="text" class="input" id="diag-trace-target" placeholder="8.8.8.8"></div>
+                    <div class="form-group"><label>Source Device (optional)</label>
+                        <select class="input select" id="diag-trace-source"><option value="">Local</option></select>
+                    </div>
+                    <button class="btn btn-primary" id="btn-diag-trace">Run Traceroute</button>
+                    <pre class="code-block" id="diag-trace-result"></pre>
+                </div>
+
+                <div class="panel one-third">
+                    <h3 class="panel-title">Port Check</h3>
+                    <div class="form-group"><label>Target</label><input type="text" class="input" id="diag-port-target" placeholder="192.168.1.1"></div>
+                    <div class="form-group"><label>Port</label><input type="number" class="input" id="diag-port-number" value="22" min="1" max="65535"></div>
+                    <div class="form-group"><label>Timeout (s)</label><input type="number" class="input" id="diag-port-timeout" value="3" min="1" max="30"></div>
+                    <button class="btn btn-primary" id="btn-diag-port">Check Port</button>
+                    <pre class="code-block" id="diag-port-result"></pre>
+                </div>
+            </div>
+
+            <div class="panel-row">
+                <div class="panel half">
+                    <h3 class="panel-title">DNS Lookup</h3>
+                    <div class="form-row">
+                        <div class="form-group flex-grow"><label>Hostname</label><input type="text" class="input" id="diag-dns-host" placeholder="example.com"></div>
+                        <div class="form-group" style="align-self:flex-end"><button class="btn btn-primary" id="btn-diag-dns">Lookup</button></div>
+                    </div>
+                    <pre class="code-block" id="diag-dns-result"></pre>
+                </div>
+                <div class="panel half">
+                    <h3 class="panel-title">Device Health Check</h3>
+                    <div class="form-row">
+                        <div class="form-group flex-grow"><label>Device</label>
+                            <select class="input select" id="diag-health-device"><option value="">Select...</option></select>
+                        </div>
+                        <div class="form-group" style="align-self:flex-end"><button class="btn btn-primary" id="btn-diag-health">Check</button></div>
+                    </div>
+                    <pre class="code-block" id="diag-health-result"></pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== AUTOMATION VIEW ===== -->
+        <section class="view" id="view-automation">
+            <h2 class="view-title">Automation</h2>
+
+            <div class="card-grid">
+                <div class="summary-card">
+                    <div class="card-label">Runbooks</div>
+                    <div class="card-value" id="auto-runbook-count">--</div>
+                </div>
+                <div class="summary-card card-green">
+                    <div class="card-label">Executions</div>
+                    <div class="card-value" id="auto-exec-count">--</div>
+                </div>
+                <div class="summary-card card-yellow">
+                    <div class="card-label">Scheduled Jobs</div>
+                    <div class="card-value" id="auto-job-count">--</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3 class="panel-title">Runbooks
+                    <button class="btn btn-sm" style="float:right" onclick="Automation.reloadRunbooks()">Reload from Disk</button>
+                </h3>
+                <div class="table-wrap">
+                    <table class="data-table" id="automation-runbooks-table">
+                        <thead><tr><th>Name</th><th>Trigger</th><th>Status</th><th>Actions</th><th>Description</th><th>Controls</th></tr></thead>
+                        <tbody id="automation-runbooks-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h3 class="panel-title">Recent Executions</h3>
+                <div class="table-wrap">
+                    <table class="data-table" id="automation-executions-table">
+                        <thead><tr><th>ID</th><th>Runbook</th><th>Trigger</th><th>Device</th><th>Status</th><th>Duration</th><th>Started</th></tr></thead>
+                        <tbody id="automation-executions-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="panel-row">
+                <div class="panel half">
+                    <h3 class="panel-title">Scheduled Jobs</h3>
+                    <div class="table-wrap">
+                        <table class="data-table" id="automation-jobs-table">
+                            <thead><tr><th>Name</th><th>Type</th><th>Cron</th><th>Next Run</th><th>Status</th><th>Actions</th></tr></thead>
+                            <tbody id="automation-jobs-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="panel half">
+                    <h3 class="panel-title">Audit Log</h3>
+                    <div class="table-wrap">
+                        <table class="data-table" id="automation-audit-table">
+                            <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Device</th><th>Description</th><th>Result</th></tr></thead>
+                            <tbody id="automation-audit-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== SITES VIEW ===== -->
+        <section class="view" id="view-sites">
+            <h2 class="view-title">Site Management</h2>
+            <div class="toolbar">
+                <select class="input select" id="site-region-filter"><option value="">All Regions</option></select>
+                <button class="btn btn-primary" id="btn-add-site" onclick="Sites.showAddModal()">+ Add Site</button>
+            </div>
+            <div class="panel"><div class="table-wrap">
+                <table class="data-table" id="sites-table">
+                    <thead><tr><th>Name</th><th>Location</th><th>Region</th><th>Devices</th><th>Online</th><th>Contact</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div></div>
+            <div id="site-modal" class="modal hidden">
+                <div class="modal-content">
+                    <h3 id="site-modal-title">Add Site</h3>
+                    <form id="site-form" onsubmit="event.preventDefault(); Sites.save()">
+                        <input type="hidden" id="sf-id">
+                        <label>Name <input class="input" id="sf-name" required></label>
+                        <label>Location <input class="input" id="sf-location"></label>
+                        <label>Region <input class="input" id="sf-region"></label>
+                        <label>Description <input class="input" id="sf-description"></label>
+                        <label>Contact <input class="input" id="sf-contact"></label>
+                        <div class="modal-actions">
+                            <button type="submit" class="btn btn-primary">Save</button>
+                            <button type="button" class="btn" onclick="$('site-modal').classList.add('hidden')">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== TOPOLOGY VIEW ===== -->
+        <section class="view" id="view-topology">
+            <h2 class="view-title">Network Topology</h2>
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="Topology.discover()">Discover Topology</button>
+                <button class="btn" onclick="Topology.saveSnapshot()">Save Snapshot</button>
+                <button class="btn" onclick="Topology.load()">Refresh</button>
+            </div>
+            <div class="panel" style="height:600px"><div id="topology-graph" style="width:100%;height:100%"></div></div>
+            <div class="panel"><h3 class="panel-title">Neighbor Table</h3>
+                <div class="table-wrap"><table class="data-table" id="topo-neighbor-table">
+                    <thead><tr><th>Device</th><th>Local Port</th><th>Neighbor</th><th>Remote Port</th><th>Platform</th><th>Protocol</th></tr></thead>
+                    <tbody></tbody>
+                </table></div>
+            </div>
+        </section>
+
+        <!-- ===== FIRMWARE VIEW ===== -->
+        <section class="view" id="view-firmware">
+            <h2 class="view-title">Firmware Management</h2>
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="Firmware.checkAll()">Check All Devices</button>
+                <button class="btn" onclick="Firmware.showCatalogModal()">+ Add to Catalog</button>
+            </div>
+            <div class="panel"><h3 class="panel-title">Device Firmware Status</h3>
+                <div class="table-wrap"><table class="data-table" id="firmware-status-table">
+                    <thead><tr><th>Device</th><th>Vendor</th><th>Model</th><th>Current Version</th><th>Recommended</th><th>Status</th></tr></thead>
+                    <tbody></tbody>
+                </table></div>
+            </div>
+            <div class="panel"><h3 class="panel-title">Firmware Catalog</h3>
+                <div class="table-wrap"><table class="data-table" id="firmware-catalog-table">
+                    <thead><tr><th>Vendor</th><th>Model</th><th>Version</th><th>Release</th><th>EOL</th><th>CVEs</th><th>Recommended</th></tr></thead>
+                    <tbody></tbody>
+                </table></div>
+            </div>
+        </section>
+
+        <!-- ===== IPAM VIEW ===== -->
+        <section class="view" id="view-ipam">
+            <h2 class="view-title">IP Address Management</h2>
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="IPAM.showAddSubnet()">+ Add Subnet</button>
+                <select class="input select" id="ipam-site-filter"><option value="">All Sites</option></select>
+            </div>
+            <div class="panel"><h3 class="panel-title">Subnets</h3>
+                <div class="table-wrap"><table class="data-table" id="ipam-subnets-table">
+                    <thead><tr><th>Network</th><th>Name</th><th>VLAN</th><th>Gateway</th><th>Utilization</th><th>Site</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table></div>
+            </div>
+            <div class="panel" id="ipam-addresses-panel" style="display:none"><h3 class="panel-title">IP Addresses</h3>
+                <div class="table-wrap"><table class="data-table" id="ipam-addresses-table">
+                    <thead><tr><th>Address</th><th>Hostname</th><th>MAC</th><th>Device</th><th>Interface</th><th>Status</th><th>Last Seen</th></tr></thead>
+                    <tbody></tbody>
+                </table></div>
+            </div>
+        </section>
+
+        <!-- ===== TRAFFIC VIEW ===== -->
+        <section class="view" id="view-traffic">
+            <h2 class="view-title">Traffic Trends</h2>
+            <div class="toolbar">
+                <select class="input select" id="traffic-device-select"></select>
+                <select class="input select" id="traffic-hours-select">
+                    <option value="1">1 Hour</option><option value="6">6 Hours</option>
+                    <option value="24" selected>24 Hours</option><option value="168">7 Days</option>
+                </select>
+                <button class="btn btn-primary" onclick="Traffic.loadTrends()">Load</button>
+            </div>
+            <div class="panel"><h3 class="panel-title">Bandwidth Utilization</h3>
+                <div class="chart-container" style="height:300px"><canvas id="chart-traffic"></canvas></div>
+            </div>
+            <div class="panel"><h3 class="panel-title">Top Talkers</h3>
+                <div class="table-wrap"><table class="data-table" id="traffic-top-table">
+                    <thead><tr><th>Device</th><th>Interface</th><th>In (bps)</th><th>Out (bps)</th><th>Utilization</th></tr></thead>
+                    <tbody></tbody>
+                </table></div>
+            </div>
+        </section>
+
+        <!-- ===== SYSLOG VIEW ===== -->
+        <section class="view" id="view-syslog">
+            <h2 class="view-title">Syslog</h2>
+            <div class="toolbar">
+                <input type="text" class="input" id="syslog-search" placeholder="Search messages...">
+                <select class="input select" id="syslog-severity-filter">
+                    <option value="">All Severities</option>
+                    <option value="0">Emergency</option><option value="1">Alert</option>
+                    <option value="2">Critical</option><option value="3">Error</option>
+                    <option value="4">Warning</option><option value="5">Notice</option>
+                    <option value="6">Info</option><option value="7">Debug</option>
+                </select>
+                <button class="btn btn-primary" onclick="Syslog.search()">Search</button>
+                <button class="btn" onclick="Syslog.toggleLive()">Live Stream</button>
+            </div>
+            <div class="panel"><div class="table-wrap" style="max-height:500px;overflow-y:auto">
+                <table class="data-table" id="syslog-table">
+                    <thead><tr><th>Time</th><th>Severity</th><th>Device</th><th>Facility</th><th>Message</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div></div>
+        </section>
+
+        <!-- ===== COMPLIANCE VIEW ===== -->
+        <section class="view" id="view-compliance">
+            <h2 class="view-title">Compliance</h2>
+            <div class="toolbar">
+                <select class="input select" id="compliance-ruleset-select"><option value="">All Rulesets</option></select>
+                <button class="btn btn-primary" onclick="Compliance.runAll()">Run All Checks</button>
+                <button class="btn" onclick="Compliance.exportReport()">Export Report</button>
+            </div>
+            <div class="card-grid">
+                <div class="summary-card card-green"><div class="card-label">Passed</div><div class="card-value" id="compliance-passed">--</div></div>
+                <div class="summary-card card-red"><div class="card-label">Failed</div><div class="card-value" id="compliance-failed">--</div></div>
+                <div class="summary-card"><div class="card-label">Score</div><div class="card-value" id="compliance-score">--</div></div>
+            </div>
+            <div class="panel"><h3 class="panel-title">Results by Device</h3>
+                <div class="table-wrap"><table class="data-table" id="compliance-results-table">
+                    <thead><tr><th>Device</th><th>Ruleset</th><th>Passed</th><th>Failed</th><th>Score</th><th>Date</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table></div>
+            </div>
+        </section>
+
+        <!-- ===== CHANGES VIEW ===== -->
+        <section class="view" id="view-changes">
+            <h2 class="view-title">Change Management</h2>
+            <div class="toolbar">
+                <select class="input select" id="change-status-filter">
+                    <option value="">All</option><option value="pending">Pending</option>
+                    <option value="approved">Approved</option><option value="rejected">Rejected</option>
+                    <option value="applied">Applied</option>
+                </select>
+                <button class="btn btn-primary" onclick="Changes.showCreateModal()">+ New Request</button>
+            </div>
+            <div class="panel"><div class="table-wrap"><table class="data-table" id="changes-table">
+                <thead><tr><th>Title</th><th>Device</th><th>Requested By</th><th>Priority</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+                <tbody></tbody>
+            </table></div></div>
+        </section>
+
+        <!-- ===== CREDENTIALS VIEW ===== -->
+        <section class="view" id="view-credentials">
+            <h2 class="view-title">Credential Management</h2>
+            <div class="toolbar">
+                <button class="btn btn-primary" onclick="Credentials.rotateSelected()">Rotate Selected</button>
+                <button class="btn" onclick="Credentials.verifyAll()">Verify All</button>
+            </div>
+            <div class="panel"><h3 class="panel-title">Stored Credentials</h3>
+                <div class="table-wrap"><table class="data-table" id="credentials-table">
+                    <thead><tr><th>Name</th><th>Username</th><th>Devices</th><th>Last Rotated</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table></div>
+            </div>
+            <div class="panel"><h3 class="panel-title">Rotation History</h3>
+                <div class="table-wrap"><table class="data-table" id="rotation-history-table">
+                    <thead><tr><th>Credential</th><th>Status</th><th>Devices Updated</th><th>Devices Failed</th><th>Started</th><th>Completed</th></tr></thead>
+                    <tbody></tbody>
+                </table></div>
+            </div>
+        </section>
+
+        <!-- ===== FIREWALL VIEW ===== -->
+        <section class="view" id="view-firewall">
+            <h2 class="view-title">Firewall Management</h2>
+            <div style="margin-bottom: 15px;">
+                <label>Device: </label>
+                <select id="firewall-device-select" class="input" style="width:220px; display:inline-block;" onchange="Firewall.loadTab()">
+                    <option value="">Select device...</option>
+                </select>
+                <div style="display:inline-block; margin-left: 20px;">
+                    <button class="btn btn-sm fw-tab active" data-tab="rules" onclick="Firewall.switchTab('rules', this)">Rules</button>
+                    <button class="btn btn-sm fw-tab" data-tab="nat" onclick="Firewall.switchTab('nat', this)">NAT</button>
+                    <button class="btn btn-sm fw-tab" data-tab="zones" onclick="Firewall.switchTab('zones', this)">Zones</button>
+                    <button class="btn btn-sm fw-tab" data-tab="objects" onclick="Firewall.switchTab('objects', this)">Objects</button>
+                </div>
+                <button class="btn btn-sm" style="margin-left:10px;" onclick="Firewall.syncRules()">Sync from Device</button>
+            </div>
+            <div id="firewall-content">
+                <p class="text-muted">Select a device to view firewall configuration.</p>
+            </div>
+        </section>
+
+        <!-- ===== AI CHAT VIEW ===== -->
+        <section class="view" id="view-chat">
+            <h2 class="view-title">AI Assistant</h2>
+
+            <div class="chat-container">
+                <div class="chat-messages" id="chat-messages">
+                    <div class="chat-bubble system">
+                        Welcome! I am your Network AI Assistant. Ask me about device status, run diagnostics, manage configurations, or troubleshoot issues.
+                    </div>
+                </div>
+                <form class="chat-input-area" id="chat-form">
+                    <input type="text" class="input chat-input" id="chat-input" placeholder="Ask the AI agent..." autocomplete="off">
+                    <button type="submit" class="btn btn-primary">Send</button>
+                </form>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<!-- Toast notification container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- Scripts -->
+<script src="/static/js/app.js"></script>
+<script src="/static/js/charts.js"></script>
+<script src="/static/js/dashboard.js"></script>
+<script src="/static/js/devices.js"></script>
+<script src="/static/js/automation.js"></script>
+<script src="/static/js/features.js"></script>
+</body>
+</html>

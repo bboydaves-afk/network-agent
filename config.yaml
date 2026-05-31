@@ -1,0 +1,75 @@
+agent:
+  name: "NetworkAgent"
+  data_dir: "./data"
+  log_level: "INFO"
+
+database:
+  path: "./data/network_agent.db"
+
+credentials:
+  encryption_key_env: "NETAGENT_ENCRYPTION_KEY"
+
+monitoring:
+  poll_interval_seconds: 60
+  metrics_retention_days: 30
+
+alerts:
+  channels:
+    slack:
+      webhook_url_env: "SLACK_WEBHOOK_URL"
+    email:
+      smtp_host: ""
+      smtp_port: 587
+      smtp_user: ""
+      smtp_password_env: "SMTP_PASSWORD"
+      from_address: ""
+    webhook:
+      default_url: ""
+
+web:
+  host: "0.0.0.0"
+  port: 8088
+  secret_key_env: "NETAGENT_SECRET_KEY"
+
+ai_agent:
+  api_key_env: "ANTHROPIC_API_KEY"
+  model: "claude-sonnet-4-5-20250929"
+  max_tokens: 4096
+
+automation:
+  enabled: true
+  runbook_dir: "./data/runbooks"
+  dry_run: false
+  max_concurrent_executions: 10
+  default_cooldown_seconds: 60
+  max_execution_duration_seconds: 600
+
+scheduler:
+  enabled: true
+  timezone: "UTC"
+  jobs:
+    nightly_backup:
+      enabled: true
+      cron: "0 2 * * *"
+      description: "Backup all device configs"
+    metric_cleanup:
+      enabled: true
+      cron: "0 3 * * *"
+      description: "Clean up metrics older than retention period"
+    weekly_compliance:
+      enabled: false
+      cron: "0 4 * * 6"
+      description: "Weekly compliance check against golden configs"
+    periodic_discovery:
+      enabled: false
+      cron: "0 6 * * 1"
+      description: "Weekly network discovery scan"
+      params:
+        subnet: ""
+        community: "public"
+
+syslog:
+  enabled: false
+  port: 514
+  bind_address: "0.0.0.0"
+  retention_days: 30
